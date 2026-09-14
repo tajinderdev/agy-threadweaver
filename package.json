@@ -1,0 +1,182 @@
+{
+  "name": "agy-threadweaver",
+  "displayName": "ThreadWeaver",
+  "description": "Antigravity Thread History, Artifact Manager, Context Size Monitor & Zip Backup Extension",
+  "version": "0.1.0",
+  "publisher": "tajinderdev",
+  "icon": "assets/icons/thumb-icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tajinderdev/agy-threadweaver"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other",
+    "Productivity"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "*",
+    "onStartupFinished",
+    "onView:threadweaver-threads"
+  ],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "threadweaver-container",
+          "title": "ThreadWeaver",
+          "icon": "assets/icons/threadweaver.svg"
+        }
+      ]
+    },
+    "views": {
+      "explorer": [
+        {
+          "id": "threadweaver-threads-explorer",
+          "name": "Antigravity Thread History",
+          "visibility": "visible"
+        }
+      ],
+      "threadweaver-container": [
+        {
+          "id": "threadweaver-threads",
+          "name": "Threads & Context",
+          "visibility": "visible"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "threadweaver.viewThreadDetails",
+        "title": "View Thread Details & Analytics",
+        "category": "ThreadWeaver",
+        "icon": "$(eye)"
+      },
+      {
+        "command": "threadweaver.focus",
+        "title": "Focus Threads View",
+        "category": "ThreadWeaver",
+        "icon": "$(history)"
+      },
+      {
+        "command": "threadweaver.refresh",
+        "title": "Refresh Threads",
+        "category": "ThreadWeaver",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "threadweaver.exportZip",
+        "title": "Export Thread as Zip",
+        "icon": "$(archive)"
+      },
+      {
+        "command": "threadweaver.importZip",
+        "title": "Import Thread from Zip...",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "threadweaver.resumeThread",
+        "title": "Resume / Switch to Thread",
+        "icon": "$(arrow-right)"
+      },
+      {
+        "command": "threadweaver.forkFreshThread",
+        "title": "Weave into Fresh Thread (Distilled Context)",
+        "icon": "$(git-branch)"
+      },
+      {
+        "command": "threadweaver.openArtifact",
+        "title": "Open Artifact",
+        "icon": "$(file)"
+      },
+      {
+        "command": "threadweaver.deleteThread",
+        "title": "Delete Thread Backup",
+        "icon": "$(trash)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "threadweaver.refresh",
+          "when": "view == threadweaver-threads || view == threadweaver-threads-explorer",
+          "group": "navigation@1"
+        },
+        {
+          "command": "threadweaver.importZip",
+          "when": "view == threadweaver-threads || view == threadweaver-threads-explorer",
+          "group": "navigation@2"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "threadweaver.viewThreadDetails",
+          "when": "viewItem == threadItem",
+          "group": "inline@0"
+        },
+        {
+          "command": "threadweaver.resumeThread",
+          "when": "viewItem == threadItem",
+          "group": "inline@1"
+        },
+        {
+          "command": "threadweaver.exportZip",
+          "when": "viewItem == threadItem",
+          "group": "inline@2"
+        },
+        {
+          "command": "threadweaver.forkFreshThread",
+          "when": "viewItem == threadItem",
+          "group": "0_fork"
+        },
+        {
+          "command": "threadweaver.deleteThread",
+          "when": "viewItem == threadItem",
+          "group": "9_delete"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "ThreadWeaver",
+      "properties": {
+        "threadweaver.brainPath": {
+          "type": "string",
+          "default": "",
+          "description": "Custom path to Antigravity brain directory (defaults to ~/.gemini/antigravity-cli/brain)"
+        },
+        "threadweaver.autoSyncOnSuccess": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically sync and snapshot threads whenever the agent completes an action with success"
+        },
+        "threadweaver.contextLimitThreshold": {
+          "type": "number",
+          "default": 100000,
+          "description": "Token count threshold considered high context load"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run build",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "build": "esbuild ./src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --minify",
+    "build:dev": "esbuild ./src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --sourcemap",
+    "test": "tsc -p ./ && node out/tests/test-core.js",
+    "package": "npx @vscode/vsce package --allow-missing-repository"
+  },
+  "dependencies": {
+    "adm-zip": "^0.5.16"
+  },
+  "devDependencies": {
+    "@types/adm-zip": "^0.5.7",
+    "@types/node": "^20.17.10",
+    "@types/vscode": "^1.85.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.7.3"
+  }
+}

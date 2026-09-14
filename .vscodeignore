@@ -1,0 +1,12 @@
+.vscode/**
+.vscode-test/**
+src/**
+tests/**
+out/**
+tsconfig.json
+**/*.map
+.git/**
+.gitignore
+scratch/**
+node_modules/**
+!node_modules/adm-zip/**
