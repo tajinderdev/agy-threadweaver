@@ -260,6 +260,79 @@ export class BrainWatcher {
         }
       }
 
+      // 🏢 Workspace Details Resolution & Deterministic Coloring
+      let wsInfo = TitleResolver.getCachedWorkspace(threadId);
+      let wsUri = wsInfo?.uri;
+      let wsPath = wsInfo?.path;
+      let wsName = wsInfo?.name;
+      let wsCorpus = wsInfo?.corpus;
+
+      // Fallback: If not found in SQLite/vscdb, parse from transcript steps / user_information / tool calls
+      if (!wsPath && steps.length > 0) {
+        for (const step of steps) {
+          const stepContent = step.content || '';
+          const wsMatch = stepContent.match(/The user has \d+ active workspaces[^\n]*\n([\s\S]*?)(?:App Data Directory:|<\/user_information>)/i);
+          if (wsMatch && wsMatch[1]) {
+            const lineMatch = wsMatch[1].match(/([A-Za-z]:[^\n\->\r]+?)(?:\s*->\s*([^\n\r]+))?$/m);
+            if (lineMatch) {
+              wsPath = lineMatch[1].trim();
+              if (lineMatch[2]) {
+                wsCorpus = lineMatch[2].trim();
+              }
+              wsName = path.basename(wsPath) || wsPath;
+              wsUri = `file:///${wsPath.replace(/\\/g, '/')}`;
+              break;
+            }
+          }
+
+          if (step.tool_calls && Array.isArray(step.tool_calls)) {
+            for (const tc of step.tool_calls) {
+              const args = tc.args || {};
+              const candidate = args.Cwd || args.DirectoryPath || args.SearchPath || args.Workspace || args.TargetFile || args.AbsolutePath;
+              if (candidate && typeof candidate === 'string') {
+                const cleaned = candidate.replace(/^["']|["']$/g, '').trim();
+                if (cleaned.length > 3 && (cleaned.includes(':\\') || cleaned.includes(':/') || cleaned.startsWith('/'))) {
+                  wsPath = cleaned;
+                  wsName = path.basename(wsPath) || wsPath;
+                  wsUri = `file:///${wsPath.replace(/\\/g, '/')}`;
+                  break;
+                }
+              }
+            }
+            if (wsPath) {
+              break;
+            }
+          }
+        }
+      }
+
+      // Check if this thread matches the currently active workspace in VS Code
+      let isCurrentWorkspace = false;
+      const currentWorkspaceFolders = vscode.workspace.workspaceFolders || [];
+      if (wsPath) {
+        const normalizedWsPath = path.normalize(wsPath).toLowerCase().replace(/[\/\\]+$/, '');
+        for (const wf of currentWorkspaceFolders) {
+          const currentPath = path.normalize(wf.uri.fsPath).toLowerCase().replace(/[\/\\]+$/, '');
+          if (normalizedWsPath === currentPath || normalizedWsPath.startsWith(currentPath) || currentPath.startsWith(normalizedWsPath)) {
+            isCurrentWorkspace = true;
+            break;
+          }
+        }
+      }
+
+      const wsColor = TitleResolver.getWorkspaceColor(wsName || wsPath || 'default');
+      const workspaceDetails = wsPath || wsName ? {
+        uri: wsUri,
+        path: wsPath,
+        name: wsName || (wsPath ? path.basename(wsPath) : 'Workspace'),
+        corpus: wsCorpus,
+        color: wsColor.hex,
+        bgColor: wsColor.bg,
+        borderColor: wsColor.border,
+        themeColor: wsColor.themeColor,
+        isCurrent: isCurrentWorkspace
+      } : undefined;
+
       return {
         id: threadId,
         title,
@@ -269,6 +342,8 @@ export class BrainWatcher {
         brainDir,
         metrics,
         status,
+        workspaceUri: wsUri,
+        workspace: workspaceDetails,
         artifacts,
         firstPrompt,
         lastPrompt,

@@ -3,6 +3,7 @@ import * as path from 'path';
 import AdmZip from 'adm-zip';
 import { ThreadMeta, ThreadStep, ContextMetrics } from '../src/models/thread';
 import { ContextDistiller } from '../src/services/distiller';
+import { TitleResolver } from '../src/services/titleResolver';
 
 function assert(condition: boolean, message: string) {
   if (!condition) {
@@ -49,6 +50,13 @@ async function runTests() {
 
   assert(sampleSteps.length === 2, 'Parsed 2 steps accurately');
   assert(estimatedTokens > 0, `Estimated tokens calculated: ${estimatedTokens} tokens`);
+
+  // Test 1b: Title & Description Extraction
+  const cleanDesc = TitleResolver.cleanDescription(sampleSteps[0].content);
+  assert(
+    cleanDesc === 'Build an Antigravity thread history extension with zip import/export',
+    'Extracted clean first description line without XML tags'
+  );
 
   // Test 2: Context Distiller Briefing Generation
   const dummyThread: ThreadMeta = {

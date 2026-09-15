@@ -2,7 +2,7 @@
   "name": "agy-threadweaver",
   "displayName": "ThreadWeaver",
   "description": "Antigravity Thread History, Artifact Manager, Context Size Monitor & Zip Backup Extension",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "publisher": "tajinderdev",
   "icon": "assets/icons/thumb-icon.png",
   "repository": {
@@ -96,19 +96,47 @@
         "command": "threadweaver.deleteThread",
         "title": "Delete Thread Backup",
         "icon": "$(trash)"
+      },
+      {
+        "command": "threadweaver.searchThreads",
+        "title": "Search & Filter Threads...",
+        "category": "ThreadWeaver",
+        "icon": "$(search)"
+      },
+      {
+        "command": "threadweaver.clearFilter",
+        "title": "Clear Thread Filter",
+        "category": "ThreadWeaver",
+        "icon": "$(clear-all)"
+      },
+      {
+        "command": "threadweaver.openWorkspaceFolder",
+        "title": "Open Workspace in New Window",
+        "category": "ThreadWeaver",
+        "icon": "$(folder)"
       }
     ],
     "menus": {
       "view/title": [
+        {
+          "command": "threadweaver.searchThreads",
+          "when": "view == threadweaver-threads || view == threadweaver-threads-explorer",
+          "group": "navigation@0"
+        },
         {
           "command": "threadweaver.refresh",
           "when": "view == threadweaver-threads || view == threadweaver-threads-explorer",
           "group": "navigation@1"
         },
         {
-          "command": "threadweaver.importZip",
+          "command": "threadweaver.clearFilter",
           "when": "view == threadweaver-threads || view == threadweaver-threads-explorer",
           "group": "navigation@2"
+        },
+        {
+          "command": "threadweaver.importZip",
+          "when": "view == threadweaver-threads || view == threadweaver-threads-explorer",
+          "group": "navigation@3"
         }
       ],
       "view/item/context": [
@@ -164,8 +192,8 @@
     "vscode:prepublish": "npm run build",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "build": "esbuild ./src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --minify",
-    "build:dev": "esbuild ./src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --sourcemap",
+    "build": "esbuild ./src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --minify && node -e \"require('fs').copyFileSync('src/services/extractTitles.py', 'dist/extractTitles.py')\"",
+    "build:dev": "esbuild ./src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --sourcemap && node -e \"require('fs').copyFileSync('src/services/extractTitles.py', 'dist/extractTitles.py')\"",
     "test": "tsc -p ./ && node out/tests/test-core.js",
     "package": "npx @vscode/vsce package --allow-missing-repository"
   },

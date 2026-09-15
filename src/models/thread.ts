@@ -14,6 +14,26 @@ export interface ThreadStep {
 
 export type ContextLoadLevel = 'light' | 'moderate' | 'heavy';
 
+export interface WorkspaceColor {
+  name: string;
+  hex: string;
+  bg: string;
+  border: string;
+  themeColor: string;
+}
+
+export interface WorkspaceDetails {
+  uri?: string;
+  path?: string;
+  name?: string;
+  corpus?: string;
+  color?: string;
+  bgColor?: string;
+  borderColor?: string;
+  themeColor?: string;
+  isCurrent?: boolean;
+}
+
 export interface ContextMetrics {
   tokenEstimate: number;
   tokenFormatted: string;
@@ -35,6 +55,7 @@ export interface ThreadMeta {
   metrics: ContextMetrics;
   status: 'active' | 'completed' | 'error' | 'idle';
   workspaceUri?: string;
+  workspace?: WorkspaceDetails;
   artifacts: ArtifactItem[];
   firstPrompt?: string;
   lastPrompt?: string;

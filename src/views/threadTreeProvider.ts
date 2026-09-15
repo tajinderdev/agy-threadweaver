@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { ThreadMeta, ContextLoadLevel } from '../models/thread';
 import { BrainWatcher } from '../services/brainWatcher';
 import { ArtifactItem } from '../models/artifact';
+import { TitleResolver } from '../services/titleResolver';
 
 export type TreeItemType = 'thread' | 'metric' | 'action' | 'artifact';
 
@@ -21,6 +22,7 @@ export class ThreadTreeItem extends vscode.TreeItem {
 export class ThreadTreeProvider implements vscode.TreeDataProvider<ThreadTreeItem> {
   private _onDidChangeTreeData: vscode.EventEmitter<ThreadTreeItem | undefined | void> = new vscode.EventEmitter<ThreadTreeItem | undefined | void>();
   readonly onDidChangeTreeData: vscode.Event<ThreadTreeItem | undefined | void> = this._onDidChangeTreeData.event;
+  private searchQuery: string = '';
 
   constructor(private readonly brainWatcher: BrainWatcher) {
     this.brainWatcher.onDidChangeThreads(() => {
@@ -32,6 +34,20 @@ export class ThreadTreeProvider implements vscode.TreeDataProvider<ThreadTreeIte
     this._onDidChangeTreeData.fire();
   }
 
+  public setSearchFilter(query: string): void {
+    this.searchQuery = (query || '').trim();
+    this.refresh();
+  }
+
+  public clearSearchFilter(): void {
+    this.searchQuery = '';
+    this.refresh();
+  }
+
+  public getSearchFilter(): string {
+    return this.searchQuery;
+  }
+
   public getTreeItem(element: ThreadTreeItem): vscode.TreeItem {
     return element;
   }
@@ -39,12 +55,59 @@ export class ThreadTreeProvider implements vscode.TreeDataProvider<ThreadTreeIte
   public async getChildren(element?: ThreadTreeItem): Promise<ThreadTreeItem[]> {
     if (!element) {
       // Root level: List all threads
-      const threads = this.brainWatcher.getThreads();
+      let threads = this.brainWatcher.getThreads();
       if (threads.length === 0) {
         const emptyItem = new ThreadTreeItem('action', 'No Antigravity threads found yet', vscode.TreeItemCollapsibleState.None);
         emptyItem.description = 'Sessions will appear here automatically';
         emptyItem.iconPath = new vscode.ThemeIcon('info');
         return [emptyItem];
+      }
+
+      const items: ThreadTreeItem[] = [];
+
+      // If search filter is active
+      if (this.searchQuery) {
+        const q = this.searchQuery.toLowerCase();
+        const matchedThreads = threads.filter((t) => {
+          const titleMatch = (t.title || '').toLowerCase().includes(q);
+          const idMatch = (t.id || '').toLowerCase().includes(q);
+          const descMatch = TitleResolver.cleanDescription(t.firstPrompt).toLowerCase().includes(q);
+          const lastDescMatch = TitleResolver.cleanDescription(t.lastPrompt).toLowerCase().includes(q);
+          const artifactMatch = (t.artifacts || []).some((a) => a.name.toLowerCase().includes(q));
+          return titleMatch || idMatch || descMatch || lastDescMatch || artifactMatch;
+        });
+
+        const filterHeader = new ThreadTreeItem(
+          'action',
+          `🔍 Filter: "${this.searchQuery}" (${matchedThreads.length} found)`,
+          vscode.TreeItemCollapsibleState.None
+        );
+        filterHeader.description = 'Click to clear filter';
+        filterHeader.iconPath = new vscode.ThemeIcon('filter-remove');
+        filterHeader.command = {
+          command: 'threadweaver.clearFilter',
+          title: 'Clear Filter'
+        };
+        items.push(filterHeader);
+
+        if (matchedThreads.length === 0) {
+          const noMatchItem = new ThreadTreeItem(
+            'action',
+            'No matching threads or descriptions found',
+            vscode.TreeItemCollapsibleState.None
+          );
+          noMatchItem.description = 'Click to clear filter';
+          noMatchItem.iconPath = new vscode.ThemeIcon('search-stop');
+          noMatchItem.command = {
+            command: 'threadweaver.clearFilter',
+            title: 'Clear Filter'
+          };
+          items.push(noMatchItem);
+          return items;
+        }
+
+        items.push(...matchedThreads.map((t) => this.createThreadTreeItem(t)));
+        return items;
       }
 
       return threads.map((t) => this.createThreadTreeItem(t));
@@ -69,6 +132,37 @@ export class ThreadTreeProvider implements vscode.TreeDataProvider<ThreadTreeIte
         arguments: [t]
       };
       items.push(detailItem);
+
+      // 0b. Workspace Info Item
+      if (t.workspace) {
+        const ws = t.workspace;
+        const wsItem = new ThreadTreeItem(
+          'action',
+          `Workspace: ${ws.name || 'Workspace'}`,
+          vscode.TreeItemCollapsibleState.None,
+          t
+        );
+        wsItem.description = ws.isCurrent ? '🟢 Active Workspace' : (ws.path ? ws.path : 'External');
+        wsItem.iconPath = new vscode.ThemeIcon(
+          ws.isCurrent ? 'folder-active' : 'folder',
+          new vscode.ThemeColor(ws.themeColor || 'charts.blue')
+        );
+        wsItem.tooltip = new vscode.MarkdownString(
+          `**Workspace:** \`${ws.name}\`\n\n` +
+          `- **Path:** \`${ws.path || 'N/A'}\`\n` +
+          `- **Status:** ${ws.isCurrent ? '🟢 Active / Current Workspace' : '🌐 External Workspace'}\n` +
+          (ws.corpus ? `- **Repository/Corpus:** \`${ws.corpus}\`\n` : '') +
+          `\n*Click to open workspace in new window*`
+        );
+        if (ws.path) {
+          wsItem.command = {
+            command: 'threadweaver.openWorkspaceFolder',
+            title: 'Open Workspace in New Window',
+            arguments: [ws.path]
+          };
+        }
+        items.push(wsItem);
+      }
 
       // 1. Context Size & Health Metric item
       const metricItem = new ThreadTreeItem(
@@ -161,13 +255,32 @@ export class ThreadTreeProvider implements vscode.TreeDataProvider<ThreadTreeIte
       thread
     );
 
-    // Sidebar description showing context window size and steps
+    // Sidebar description showing workspace tag, context window size and steps
     const pinBadge = thread.pinned ? '📌 ' : '';
-    item.description = `${pinBadge}~${thread.metrics.tokenFormatted} tokens • ${thread.metrics.stepCount} steps`;
+    const ws = thread.workspace;
+    let wsTag = '';
+    if (ws && ws.name) {
+      wsTag = ws.isCurrent ? `[⚡ ${ws.name}] ` : `[${ws.name}] `;
+    }
+
+    item.description = `${pinBadge}${wsTag}~${thread.metrics.tokenFormatted} tokens • ${thread.metrics.stepCount} steps`;
 
     // Tooltip with comprehensive thread details
+    const cleanDesc = TitleResolver.cleanDescription(thread.firstPrompt);
     const tooltip = new vscode.MarkdownString();
     tooltip.appendMarkdown(`### ${thread.title}\n\n`);
+    if (cleanDesc) {
+      tooltip.appendMarkdown(`> **Initial Request / Description:**\n> ${cleanDesc}\n\n`);
+    }
+    if (ws) {
+      tooltip.appendMarkdown(`- **🏢 Workspace:** \`${ws.name}\` (${ws.isCurrent ? '🟢 Current Workspace' : '🌐 External Workspace'})\n`);
+      if (ws.path) {
+        tooltip.appendMarkdown(`- **📍 Workspace Path:** \`${ws.path}\`\n`);
+      }
+      if (ws.corpus) {
+        tooltip.appendMarkdown(`- **🧬 Corpus/Repo:** \`${ws.corpus}\`\n`);
+      }
+    }
     tooltip.appendMarkdown(`- **Thread ID:** \`${thread.id}\`\n`);
     tooltip.appendMarkdown(`- **Context Window:** ~${thread.metrics.tokenFormatted} tokens (${thread.metrics.byteSizeFormatted})\n`);
     tooltip.appendMarkdown(`- **Load Level:** **${thread.metrics.loadLevel.toUpperCase()}** (${thread.metrics.percentageOfLimit}% threshold)\n`);
@@ -180,15 +293,19 @@ export class ThreadTreeProvider implements vscode.TreeDataProvider<ThreadTreeIte
     // Custom viewItem context value for menu actions
     item.contextValue = 'threadItem';
 
-    // Status icon
+    // Status / Workspace Color Icon
+    const iconColor = ws?.themeColor ? new vscode.ThemeColor(ws.themeColor) : undefined;
+
     if (thread.status === 'completed') {
       item.iconPath = new vscode.ThemeIcon('pass-filled', new vscode.ThemeColor('testing.iconPassed'));
     } else if (thread.status === 'active') {
-      item.iconPath = new vscode.ThemeIcon('play-circle', new vscode.ThemeColor('charts.blue'));
+      item.iconPath = new vscode.ThemeIcon('play-circle', iconColor || new vscode.ThemeColor('charts.blue'));
     } else if (thread.status === 'error') {
       item.iconPath = new vscode.ThemeIcon('error', new vscode.ThemeColor('errorForeground'));
     } else {
-      item.iconPath = this.getHealthIcon(thread.metrics.loadLevel);
+      item.iconPath = ws?.themeColor
+        ? new vscode.ThemeIcon(ws.isCurrent ? 'circle-filled' : 'circle-outline', iconColor)
+        : this.getHealthIcon(thread.metrics.loadLevel);
     }
 
     return item;

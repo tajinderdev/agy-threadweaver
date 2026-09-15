@@ -3,6 +3,7 @@ import { StorageService } from './services/storageService';
 import { BrainWatcher } from './services/brainWatcher';
 import { ZipService } from './services/zipService';
 import { ContextDistiller } from './services/distiller';
+import { TitleResolver } from './services/titleResolver';
 import { ThreadTreeProvider, ThreadTreeItem } from './views/threadTreeProvider';
 import { ThreadDetailPanel } from './views/webviews/threadDetailPanel';
 import { ThreadMeta } from './models/thread';
@@ -228,6 +229,22 @@ export async function activate(context: vscode.ExtensionContext) {
     }
   );
 
+  // 5b. Command: Open Workspace Folder
+  const openWorkspaceCmd = vscode.commands.registerCommand(
+    'threadweaver.openWorkspaceFolder',
+    async (workspacePath?: string) => {
+      if (!workspacePath) {
+        return;
+      }
+      try {
+        const uri = vscode.Uri.file(workspacePath);
+        await vscode.commands.executeCommand('vscode.openFolder', uri, { forceNewWindow: true });
+      } catch (err: any) {
+        vscode.window.showErrorMessage(`Could not open workspace folder: ${err?.message || err}`);
+      }
+    }
+  );
+
   // 6. Command: Open Artifact
   const openArtifactCmd = vscode.commands.registerCommand(
     'threadweaver.openArtifact',
@@ -290,14 +307,157 @@ export async function activate(context: vscode.ExtensionContext) {
     }
   );
 
+  // 9. Command: Search & Filter Threads (by Title, Description Line, Prompts, IDs, Artifacts)
+  const searchThreadsCmd = vscode.commands.registerCommand(
+    'threadweaver.searchThreads',
+    async () => {
+      const threads = brainWatcher.getThreads();
+      if (threads.length === 0) {
+        vscode.window.showInformationMessage('No Antigravity threads found to search.');
+        return;
+      }
+
+      interface ThreadQuickPickItem extends vscode.QuickPickItem {
+        thread?: ThreadMeta;
+        isAction?: boolean;
+        action?: () => Promise<void>;
+      }
+
+      const quickPick = vscode.window.createQuickPick<ThreadQuickPickItem>();
+      quickPick.placeholder = 'Search threads by Title, Description line, Prompt, ID, or Artifact...';
+      quickPick.matchOnDescription = true;
+      quickPick.matchOnDetail = true;
+
+      const populateItems = (filterQuery: string) => {
+        const q = filterQuery.toLowerCase().trim();
+        const items: ThreadQuickPickItem[] = [];
+
+        if (q) {
+          // Option to apply filter directly to the sidebar tree view
+          items.push({
+            label: `$(filter) Filter sidebar tree by: "${filterQuery}"`,
+            description: 'Apply this filter persistently in the sidebar view',
+            alwaysShow: true,
+            isAction: true,
+            action: async () => {
+              threadTreeProvider.setSearchFilter(filterQuery);
+              vscode.window.showInformationMessage(`Sidebar filtered by "${filterQuery}".`);
+            }
+          });
+        }
+
+        const filtered = threads.filter((t) => {
+          if (!q) {
+            return true;
+          }
+          const titleMatch = (t.title || '').toLowerCase().includes(q);
+          const idMatch = (t.id || '').toLowerCase().includes(q);
+          const descMatch = TitleResolver.cleanDescription(t.firstPrompt).toLowerCase().includes(q);
+          const lastDescMatch = TitleResolver.cleanDescription(t.lastPrompt).toLowerCase().includes(q);
+          const artifactMatch = (t.artifacts || []).some((a) => a.name.toLowerCase().includes(q));
+          return titleMatch || idMatch || descMatch || lastDescMatch || artifactMatch;
+        });
+
+        for (const t of filtered) {
+          const pinBadge = t.pinned ? '$(pin) ' : '';
+          const descLine = TitleResolver.cleanDescription(t.firstPrompt);
+          const detailText = descLine ? `📝 ${descLine}` : `ID: ${t.id} • ${t.artifacts.length} artifact(s)`;
+
+          items.push({
+            label: `${pinBadge}${t.title}`,
+            description: `~${t.metrics.tokenFormatted} tokens • ${t.metrics.stepCount} steps • ${new Date(t.updatedAt).toLocaleDateString()}`,
+            detail: detailText,
+            thread: t
+          });
+        }
+
+        quickPick.items = items;
+      };
+
+      populateItems('');
+
+      quickPick.onDidChangeValue((val) => {
+        populateItems(val);
+      });
+
+      quickPick.onDidAccept(async () => {
+        const selected = quickPick.selectedItems[0];
+        quickPick.hide();
+        if (!selected) {
+          return;
+        }
+
+        if (selected.isAction && selected.action) {
+          await selected.action();
+          return;
+        }
+
+        if (selected.thread) {
+          const t = selected.thread;
+          const action = await vscode.window.showQuickPick(
+            [
+              {
+                label: '$(dashboard) View Analytics & Timeline',
+                description: 'Open full thread dashboard & message breakdown',
+                action: 'details'
+              },
+              {
+                label: '$(git-branch) Fork into Fresh Thread',
+                description: 'Distill context and copy continuation prompt',
+                action: 'fork'
+              },
+              {
+                label: '$(archive) Export as Zip Archive',
+                description: 'Save thread transcript and all artifacts',
+                action: 'export'
+              },
+              {
+                label: '$(filter) Filter Sidebar for this Thread',
+                description: `Show only "${t.title}" in sidebar`,
+                action: 'filter'
+              }
+            ],
+            {
+              placeHolder: `Action for "${t.title}"`
+            }
+          );
+
+          if (action?.action === 'details') {
+            await ThreadDetailPanel.render(context.extensionUri, t, brainWatcher, storageService);
+          } else if (action?.action === 'fork') {
+            await vscode.commands.executeCommand('threadweaver.forkFreshThread', t);
+          } else if (action?.action === 'export') {
+            await vscode.commands.executeCommand('threadweaver.exportZip', t);
+          } else if (action?.action === 'filter') {
+            threadTreeProvider.setSearchFilter(t.title);
+          }
+        }
+      });
+
+      quickPick.show();
+    }
+  );
+
+  // 10. Command: Clear Filter
+  const clearFilterCmd = vscode.commands.registerCommand(
+    'threadweaver.clearFilter',
+    async () => {
+      threadTreeProvider.clearSearchFilter();
+      vscode.window.showInformationMessage('ThreadWeaver: Filter cleared.');
+    }
+  );
+
   context.subscriptions.push(
     focusCmd,
     viewThreadDetailsCmd,
     refreshCmd,
+    searchThreadsCmd,
+    clearFilterCmd,
     exportZipCmd,
     importZipCmd,
     resumeThreadCmd,
     forkFreshThreadCmd,
+    openWorkspaceCmd,
     openArtifactCmd,
     renameThreadCmd,
     deleteThreadCmd,

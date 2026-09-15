@@ -1,5 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
-  <circle cx="12" cy="12" r="4"/>
-  <path d="M9 12h6M12 9v6"/>
+  <!-- Interwoven thread paths (Conversation streams weaving & branching) -->
+  <path d="M6 3v4a4 4 0 0 0 4 4h4a4 4 0 0 1 4 4v6"/>
+  <path d="M18 3v4a4 4 0 0 1-4 4h-4a4 4 0 0 0-4 4v6"/>
+  <!-- Central crossover checkpoint -->
+  <line x1="12" y1="9" x2="12" y2="13" stroke-width="2"/>
+  <!-- Thread checkpoint nodes -->
+  <circle cx="6" cy="3" r="1.75" fill="currentColor"/>
+  <circle cx="18" cy="3" r="1.75" fill="currentColor"/>
+  <circle cx="6" cy="21" r="1.75" fill="currentColor"/>
+  <circle cx="18" cy="21" r="1.75" fill="currentColor"/>
+  <circle cx="12" cy="11" r="1.5" fill="currentColor"/>
 </svg>

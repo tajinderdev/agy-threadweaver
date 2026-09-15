@@ -42,6 +42,18 @@ export class ThreadDetailPanel {
           case 'fork':
             vscode.commands.executeCommand('threadweaver.forkFreshThread', this._thread);
             return;
+          case 'openWorkspace':
+            if (message.path) {
+              const wsUri = vscode.Uri.file(message.path);
+              await vscode.commands.executeCommand('vscode.openFolder', wsUri, { forceNewWindow: true });
+            }
+            return;
+          case 'copyText':
+            if (message.text) {
+              await vscode.env.clipboard.writeText(message.text);
+              vscode.window.showInformationMessage(message.message || 'Copied to clipboard!');
+            }
+            return;
           case 'openArtifact':
             if (message.path) {
               const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(message.path));
@@ -446,6 +458,71 @@ export class ThreadDetailPanel {
       font-family: monospace;
       font-size: 11px;
     }
+    /* Workspace Card */
+    .workspace-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 16px;
+      margin-bottom: 20px;
+    }
+    .ws-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .ws-title-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .ws-status-badge {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-weight: 600;
+      margin-left: 8px;
+      display: inline-block;
+    }
+    .ws-current {
+      background: rgba(16, 185, 129, 0.2);
+      color: #10b981;
+      border: 1px solid rgba(16, 185, 129, 0.4);
+    }
+    .ws-other {
+      background: rgba(139, 92, 246, 0.2);
+      color: #a78bfa;
+      border: 1px solid rgba(139, 92, 246, 0.4);
+    }
+    .ws-details-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 12.5px;
+      background: rgba(0,0,0,0.1);
+      padding: 10px 14px;
+      border-radius: 4px;
+      border: 1px solid rgba(128,128,128,0.15);
+    }
+    .ws-detail-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .ws-detail-label {
+      opacity: 0.7;
+      font-size: 11.5px;
+      min-width: 130px;
+    }
+    .ws-path-code {
+      font-family: monospace;
+      font-size: 12px;
+      word-break: break-all;
+    }
     .empty-state {
       opacity: 0.6;
       font-style: italic;
@@ -461,6 +538,11 @@ export class ThreadDetailPanel {
     </div>
     <div class="badges">
       <span class="badge badge-status">${t.status}</span>
+      ${t.workspace ? `
+        <span class="badge badge-workspace" style="background: ${t.workspace.bgColor || 'rgba(59,130,246,0.18)'}; border-color: ${t.workspace.borderColor || '#3b82f6'}; color: ${t.workspace.color || '#3b82f6'}; font-weight: 600;">
+          📁 ${this.escapeHtml(t.workspace.name || 'Workspace')} ${t.workspace.isCurrent ? '⚡ ACTIVE' : ''}
+        </span>
+      ` : ''}
       <span class="badge">ID: ${t.id}</span>
       <span class="badge">Created: ${new Date(t.createdAt).toLocaleDateString()}</span>
       <span class="badge">${t.pinned ? '📌 Pinned' : 'Normal'}</span>
@@ -473,6 +555,57 @@ export class ThreadDetailPanel {
       <button class="secondary" onclick="postAction('refresh')">🔄 Refresh</button>
     </div>
   </div>
+
+  <!-- Workspace Details & Relationship Card -->
+  ${t.workspace ? `
+  <div class="workspace-card" style="border-left: 4px solid ${t.workspace.color || '#3b82f6'};">
+    <div class="ws-header">
+      <div class="ws-title-group">
+        <span style="font-size: 20px;">📁</span>
+        <div>
+          <span style="font-weight: 600; font-size: 15px; color: ${t.workspace.color || 'inherit'};">${this.escapeHtml(t.workspace.name || 'Workspace')}</span>
+          <span class="ws-status-badge ${t.workspace.isCurrent ? 'ws-current' : 'ws-other'}">
+            ${t.workspace.isCurrent ? '🟢 Current Window Workspace' : '🌐 External Workspace'}
+          </span>
+        </div>
+      </div>
+      <div style="display: flex; gap: 8px; align-items: center;">
+        ${t.workspace.path ? `
+          <button class="secondary small-btn" onclick="postAction('openWorkspace', { path: '${this.escapeJs(t.workspace.path)}' })">
+            📂 Open Workspace
+          </button>
+          <button class="secondary small-btn" onclick="postAction('copyText', { text: '${this.escapeJs(t.workspace.path)}', message: 'Workspace path copied!' })">
+            📋 Copy Path
+          </button>
+        ` : ''}
+      </div>
+    </div>
+    <div class="ws-details-grid">
+      ${t.workspace.path ? `
+        <div class="ws-detail-item">
+          <span class="ws-detail-label">📁 Folder Path:</span>
+          <code class="ws-path-code">${this.escapeHtml(t.workspace.path)}</code>
+        </div>
+      ` : ''}
+      ${t.workspace.corpus ? `
+        <div class="ws-detail-item">
+          <span class="ws-detail-label">🧬 Corpus / Repo:</span>
+          <code>${this.escapeHtml(t.workspace.corpus)}</code>
+        </div>
+      ` : ''}
+      ${t.workspace.uri ? `
+        <div class="ws-detail-item">
+          <span class="ws-detail-label">🔗 URI:</span>
+          <code style="font-size: 11px; opacity: 0.75;">${this.escapeHtml(t.workspace.uri)}</code>
+        </div>
+      ` : ''}
+      <div class="ws-detail-item">
+        <span class="ws-detail-label">🏷️ Relationship:</span>
+        <span>${t.workspace.isCurrent ? 'This thread was conducted in the project currently opened in your active IDE window.' : 'This thread was conducted in a separate project workspace.'}</span>
+      </div>
+    </div>
+  </div>
+  ` : ''}
 
   <!-- Context Window Load Meter -->
   <div class="meter-card">

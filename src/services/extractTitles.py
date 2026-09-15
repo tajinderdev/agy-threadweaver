@@ -4,13 +4,15 @@ import sqlite3
 import base64
 import re
 import json
+import urllib.parse
 
-def get_all_titles():
+def get_metadata():
     titles = {}
+    workspaces = {}
     appdata = os.environ.get('APPDATA', '')
     userprofile = os.environ.get('USERPROFILE', os.path.expanduser('~'))
 
-    # 1. state.vscdb
+    # 1. state.vscdb for titles
     state_db = os.path.join(appdata, 'Antigravity IDE', 'User', 'globalStorage', 'state.vscdb')
     if os.path.exists(state_db):
         try:
@@ -71,8 +73,95 @@ def get_all_titles():
             except:
                 pass
 
-    return titles
+    # 4. Extract Workspaces from conversations/*.db
+    conv_dirs = [
+        os.path.join(userprofile, '.gemini', 'antigravity-cli', 'conversations'),
+        os.path.join(userprofile, '.gemini', 'antigravity-ide', 'conversations'),
+        os.path.join(userprofile, '.gemini', 'antigravity', 'conversations')
+    ]
+    for cd in conv_dirs:
+        if os.path.exists(cd):
+            try:
+                for f in os.listdir(cd):
+                    if f.endswith('.db'):
+                        cid = f[:-3]
+                        try:
+                            conn = sqlite3.connect(os.path.join(cd, f))
+                            cur = conn.cursor()
+                            cur.execute("SELECT data FROM trajectory_metadata_blob WHERE id='main';")
+                            row = cur.fetchone()
+                            if row and row[0]:
+                                raw = row[0]
+                                m_uri = re.search(rb'file:///([^\x00-\x1f\x7f-\xff\x12\x1a\x22]+)', raw)
+                                m_corpus = re.search(rb'\x1aS\n\x1c([a-zA-Z0-9_\-\./]+)', raw) or re.search(rb'\n\x1c([a-zA-Z0-9_\-\./]+)', raw)
+
+                                if m_uri:
+                                    raw_uri_str = 'file:///' + m_uri.group(1).decode('utf-8', 'ignore').rstrip('\x12\x1a\x00')
+                                    clean_path = urllib.parse.unquote(raw_uri_str.replace('file:///', ''))
+                                    if clean_path.startswith('/') and len(clean_path) > 2 and clean_path[2] == ':':
+                                        clean_path = clean_path[1:]
+                                    clean_path = clean_path.replace('/', '\\')
+                                    ws_name = os.path.basename(clean_path.rstrip('\\/')) or clean_path
+                                    corpus = m_corpus.group(1).decode('utf-8', 'ignore') if m_corpus else None
+
+                                    workspaces[cid] = {
+                                        'uri': raw_uri_str,
+                                        'path': clean_path,
+                                        'name': ws_name,
+                                        'corpus': corpus
+                                    }
+                            conn.close()
+                        except:
+                            pass
+            except:
+                pass
+
+    # 5. Extract Workspaces from workspaceStorage
+    ws_storage = os.path.join(appdata, 'Antigravity IDE', 'User', 'workspaceStorage')
+    if os.path.exists(ws_storage):
+        try:
+            for ws_dir in os.listdir(ws_storage):
+                ws_json = os.path.join(ws_storage, ws_dir, 'workspace.json')
+                db_path = os.path.join(ws_storage, ws_dir, 'state.vscdb')
+                folder_uri = None
+                if os.path.exists(ws_json):
+                    try:
+                        with open(ws_json, 'r', encoding='utf-8') as fp:
+                            folder_uri = json.load(fp).get('folder')
+                    except:
+                        pass
+                if folder_uri and os.path.exists(db_path):
+                    try:
+                        clean_path = urllib.parse.unquote(folder_uri.replace('file:///', ''))
+                        if clean_path.startswith('/') and len(clean_path) > 2 and clean_path[2] == ':':
+                            clean_path = clean_path[1:]
+                        clean_path = clean_path.replace('/', '\\')
+                        ws_name = os.path.basename(clean_path.rstrip('\\/')) or clean_path
+
+                        conn = sqlite3.connect(db_path)
+                        cur = conn.cursor()
+                        for (k,) in cur.execute('SELECT key FROM ItemTable'):
+                            m = re.search(r'([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})', k)
+                            if m:
+                                cid = m.group(1)
+                                if cid not in workspaces:
+                                    workspaces[cid] = {
+                                        'uri': folder_uri,
+                                        'path': clean_path,
+                                        'name': ws_name
+                                    }
+                        conn.close()
+                    except:
+                        pass
+        except:
+            pass
+
+    return {
+        'titles': titles,
+        'workspaces': workspaces
+    }
 
 if __name__ == '__main__':
-    titles = get_all_titles()
-    json.dump(titles, sys.stdout)
+    data = get_metadata()
+    json.dump(data, sys.stdout)
+
