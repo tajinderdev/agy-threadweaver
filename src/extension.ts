@@ -196,18 +196,31 @@ export async function activate(context: vscode.ExtensionContext) {
         const transcript = await brainWatcher.loadTranscript(thread.id);
         const briefing = ContextDistiller.generateBriefing(thread, transcript);
 
-        // Copy to clipboard
-        await vscode.env.clipboard.writeText(briefing);
+        // 1. Save the briefing to a physical markdown file in the workspace
+        let saveUri: vscode.Uri;
+        const workspaceFolders = vscode.workspace.workspaceFolders;
+        if (workspaceFolders && workspaceFolders.length > 0) {
+          saveUri = vscode.Uri.joinPath(workspaceFolders[0].uri, `context_${thread.id.substring(0, 8)}.md`);
+        } else {
+          // Fallback to a global temp directory if no workspace is open
+          const os = require('os');
+          const path = require('path');
+          saveUri = vscode.Uri.file(path.join(os.tmpdir(), `context_${thread.id.substring(0, 8)}.md`));
+        }
 
-        // Open briefing in an untitled markdown editor document for immediate preview and editing
-        const doc = await vscode.workspace.openTextDocument({
-          language: 'markdown',
-          content: briefing
-        });
+        const encoder = new TextEncoder();
+        await vscode.workspace.fs.writeFile(saveUri, encoder.encode(briefing));
+
+        // 2. Open the newly saved file so the user can see it
+        const doc = await vscode.workspace.openTextDocument(saveUri);
         await vscode.window.showTextDocument(doc, { preview: true });
 
+        // 3. Prepare the prompt and copy it to the clipboard
+        const prompt = `Please review @${saveUri.path.split('/').pop()} and gather knowledge of the previous task and its artifacts. Then let's start fresh and continue where the previous thread left off.`;
+        await vscode.env.clipboard.writeText(prompt);
+
         vscode.window.showInformationMessage(
-          `🚀 Distilled Context Briefing copied to clipboard! Paste it into a new Antigravity chat to continue with a clean context window.`
+          `Context saved to ${saveUri.path.split('/').pop()}! A starter prompt has been copied to your clipboard. Start a new chat and paste it!`
         );
       } catch (err: any) {
         vscode.window.showErrorMessage(`Failed to distill thread context: ${err?.message || err}`);

@@ -2,7 +2,7 @@
   "name": "agy-threadweaver",
   "displayName": "ThreadWeaver",
   "description": "Antigravity Thread History, Artifact Manager, Context Size Monitor & Zip Backup Extension",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "tajinderdev",
   "icon": "assets/icons/thumb-icon.png",
   "repository": {
