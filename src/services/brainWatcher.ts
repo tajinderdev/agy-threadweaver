@@ -226,7 +226,7 @@ export class BrainWatcher {
 
       // Context Metrics calculation
       const tokenEstimate = Math.max(Math.round(totalChars / 4), Math.round(byteSize / 4));
-      const threshold = vscode.workspace.getConfiguration('threadweaver').get<number>('contextLimitThreshold', 100000);
+      const threshold = vscode.workspace.getConfiguration('threadweaver').get<number>('contextLimitThreshold', 2000000);
 
       let loadLevel: ContextLoadLevel = 'light';
       if (tokenEstimate > threshold) {

@@ -4,7 +4,7 @@ import { BrainWatcher } from '../services/brainWatcher';
 import { ArtifactItem } from '../models/artifact';
 import { TitleResolver } from '../services/titleResolver';
 
-export type TreeItemType = 'thread' | 'metric' | 'action' | 'artifact';
+export type TreeItemType = 'thread' | 'metric' | 'action' | 'artifact' | 'group';
 
 export class ThreadTreeItem extends vscode.TreeItem {
   constructor(
@@ -13,9 +13,40 @@ export class ThreadTreeItem extends vscode.TreeItem {
     collapsibleState: vscode.TreeItemCollapsibleState,
     public readonly thread?: ThreadMeta,
     public readonly artifact?: ArtifactItem,
-    public readonly actionCommand?: string
+    public readonly actionCommand?: string,
+    public readonly groupThreads?: ThreadMeta[]
   ) {
     super(label, collapsibleState);
+  }
+}
+
+function formatRelativeTime(dateStr: string): string {
+  try {
+    const d = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - d.getTime();
+    const diffMins = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    if (diffMins < 1) {
+      return 'Just now';
+    }
+    if (diffMins < 60) {
+      return `${diffMins}m ago`;
+    }
+    if (diffHours < 24 && d.getDate() === now.getDate()) {
+      return `${diffHours}h ago`;
+    }
+    if (diffDays === 1 || (diffHours < 48 && d.getDate() === now.getDate() - 1)) {
+      return 'Yesterday';
+    }
+    if (diffDays < 7) {
+      return `${diffDays}d ago`;
+    }
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  } catch {
+    return '';
   }
 }
 
@@ -110,7 +141,18 @@ export class ThreadTreeProvider implements vscode.TreeDataProvider<ThreadTreeIte
         return items;
       }
 
+      // Timeframe grouping for long-term scalability (500 - 1000+ threads)
+      const groupByTimeframe = vscode.workspace.getConfiguration('threadweaver').get<boolean>('groupByTimeframe', true);
+      if (groupByTimeframe && threads.length >= 6) {
+        return this.createTimeframeGroups(threads);
+      }
+
       return threads.map((t) => this.createThreadTreeItem(t));
+    }
+
+    // Children of a Group (Section)
+    if (element.itemType === 'group' && element.groupThreads) {
+      return element.groupThreads.map((t) => this.createThreadTreeItem(t));
     }
 
     // Children of a thread
@@ -247,6 +289,76 @@ export class ThreadTreeProvider implements vscode.TreeDataProvider<ThreadTreeIte
     return [];
   }
 
+  private createTimeframeGroups(threads: ThreadMeta[]): ThreadTreeItem[] {
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const startOfYesterday = startOfToday - 24 * 60 * 60 * 1000;
+    const startOfPast7Days = startOfToday - 7 * 24 * 60 * 60 * 1000;
+    const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+
+    const pinned: ThreadMeta[] = [];
+    const today: ThreadMeta[] = [];
+    const yesterday: ThreadMeta[] = [];
+    const past7Days: ThreadMeta[] = [];
+    const earlierMonth: ThreadMeta[] = [];
+    const older: ThreadMeta[] = [];
+
+    for (const t of threads) {
+      if (t.pinned) {
+        pinned.push(t);
+        continue;
+      }
+
+      const tTime = new Date(t.updatedAt).getTime();
+      if (tTime >= startOfToday) {
+        today.push(t);
+      } else if (tTime >= startOfYesterday) {
+        yesterday.push(t);
+      } else if (tTime >= startOfPast7Days) {
+        past7Days.push(t);
+      } else if (tTime >= startOfThisMonth) {
+        earlierMonth.push(t);
+      } else {
+        older.push(t);
+      }
+    }
+
+    const groupItems: ThreadTreeItem[] = [];
+
+    const addGroup = (
+      name: string,
+      items: ThreadMeta[],
+      icon: string,
+      expanded: boolean
+    ) => {
+      if (items.length === 0) {
+        return;
+      }
+      const groupItem = new ThreadTreeItem(
+        'group',
+        name,
+        expanded ? vscode.TreeItemCollapsibleState.Expanded : vscode.TreeItemCollapsibleState.Collapsed,
+        undefined,
+        undefined,
+        undefined,
+        items
+      );
+      groupItem.description = `${items.length} thread${items.length === 1 ? '' : 's'}`;
+      groupItem.iconPath = new vscode.ThemeIcon(icon);
+      groupItem.contextValue = 'threadGroup';
+      groupItems.push(groupItem);
+    };
+
+    addGroup('📌 Pinned', pinned, 'pinned', true);
+    addGroup('⚡ Today', today, 'history', true);
+    addGroup('🗓️ Yesterday', yesterday, 'calendar', false);
+    addGroup('📅 Past 7 Days', past7Days, 'calendar', false);
+    addGroup('🗓️ Earlier This Month', earlierMonth, 'calendar', false);
+    addGroup('📦 Older Sessions', older, 'archive', false);
+
+    return groupItems;
+  }
+
   private createThreadTreeItem(thread: ThreadMeta): ThreadTreeItem {
     const item = new ThreadTreeItem(
       'thread',
@@ -255,15 +367,18 @@ export class ThreadTreeProvider implements vscode.TreeDataProvider<ThreadTreeIte
       thread
     );
 
-    // Sidebar description showing workspace tag, context window size and steps
+    // Sidebar description showing workspace tag, relative timestamp, context size and steps
     const pinBadge = thread.pinned ? '📌 ' : '';
     const ws = thread.workspace;
     let wsTag = '';
     if (ws && ws.name) {
-      wsTag = ws.isCurrent ? `[⚡ ${ws.name}] ` : `[${ws.name}] `;
+      wsTag = ws.isCurrent ? `[${ws.name}] ` : `[${ws.name}] `;
     }
 
-    item.description = `${pinBadge}${wsTag}~${thread.metrics.tokenFormatted} tokens • ${thread.metrics.stepCount} steps`;
+    const relTime = formatRelativeTime(thread.updatedAt);
+    const timeStr = relTime ? `${relTime} • ` : '';
+
+    item.description = `${pinBadge}${wsTag}${timeStr}~${thread.metrics.tokenFormatted} tokens • ${thread.metrics.stepCount} steps`;
 
     // Tooltip with comprehensive thread details
     const cleanDesc = TitleResolver.cleanDescription(thread.firstPrompt);

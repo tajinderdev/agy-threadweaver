@@ -212,23 +212,29 @@ export class ThreadDetailPanel {
       --bg: var(--vscode-editor-background);
       --fg: var(--vscode-editor-foreground);
       --card-bg: var(--vscode-sideBar-background);
-      --border: var(--vscode-widget-border, #333);
+      --border: var(--vscode-widget-border, rgba(128, 128, 128, 0.25));
       --accent: var(--vscode-button-background, #007acc);
       --accent-hover: var(--vscode-button-hoverBackground, #0062a3);
-      --font: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif);
+      --font: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif);
+      --font-mono: var(--vscode-editor-font-family, Consolas, 'Courier New', monospace);
+    }
+    * {
+      box-sizing: border-box;
     }
     body {
       font-family: var(--font);
       background: var(--bg);
       color: var(--fg);
-      padding: 24px;
+      padding: 28px 32px;
       margin: 0;
-      line-height: 1.5;
+      font-size: 14px;
+      line-height: 1.65;
+      letter-spacing: 0.01em;
     }
     .header {
       border-bottom: 1px solid var(--border);
-      padding-bottom: 18px;
-      margin-bottom: 20px;
+      padding-bottom: 22px;
+      margin-bottom: 24px;
     }
     .title-row {
       display: flex;
@@ -237,24 +243,27 @@ export class ThreadDetailPanel {
       gap: 16px;
     }
     h1 {
-      font-size: 22px;
+      font-size: 24px;
       margin: 0;
-      font-weight: 600;
+      font-weight: 650;
+      line-height: 1.35;
     }
     .badges {
       display: flex;
-      gap: 8px;
-      margin-top: 8px;
+      gap: 10px;
+      margin-top: 10px;
       flex-wrap: wrap;
+      align-items: center;
     }
     .badge {
-      font-size: 11px;
-      padding: 3px 8px;
+      font-size: 12px;
+      padding: 4px 10px;
       border-radius: 4px;
       background: var(--card-bg);
       border: 1px solid var(--border);
       text-transform: uppercase;
-      font-weight: 500;
+      font-weight: 600;
+      letter-spacing: 0.03em;
     }
     .badge-status {
       background: ${t.status === 'completed' ? '#1b5e20' : t.status === 'active' ? '#0d47a1' : '#37474f'};
@@ -262,25 +271,29 @@ export class ThreadDetailPanel {
     }
     .actions-bar {
       display: flex;
-      gap: 10px;
-      margin-top: 14px;
+      gap: 12px;
+      margin-top: 18px;
       flex-wrap: wrap;
     }
     button {
       background: var(--accent);
       color: var(--vscode-button-foreground, #fff);
       border: none;
-      padding: 8px 14px;
-      border-radius: 4px;
-      font-size: 13px;
+      padding: 9px 16px;
+      border-radius: 5px;
+      font-size: 13.5px;
+      font-weight: 500;
       cursor: pointer;
       display: inline-flex;
       align-items: center;
-      gap: 6px;
-      transition: background 0.15s;
+      gap: 7px;
+      transition: background 0.15s, transform 0.05s;
     }
     button:hover {
       background: var(--accent-hover);
+    }
+    button:active {
+      transform: scale(0.98);
     }
     button.secondary {
       background: var(--card-bg);
@@ -291,28 +304,28 @@ export class ThreadDetailPanel {
       background: var(--border);
     }
     .small-btn {
-      padding: 4px 10px;
-      font-size: 12px;
+      padding: 5px 12px;
+      font-size: 12.5px;
     }
     /* Context Load Meter */
     .meter-card {
       background: var(--card-bg);
       border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 16px;
-      margin-bottom: 24px;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 26px;
     }
     .meter-header {
       display: flex;
       justify-content: space-between;
-      font-weight: 500;
-      margin-bottom: 8px;
-      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 10px;
+      font-size: 14px;
     }
     .progress-bar-bg {
       background: rgba(128,128,128,0.2);
       border-radius: 10px;
-      height: 10px;
+      height: 12px;
       overflow: hidden;
     }
     .progress-bar-fill {
@@ -323,148 +336,163 @@ export class ThreadDetailPanel {
     }
     .meter-stats {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-      gap: 12px;
-      margin-top: 14px;
-      font-size: 12px;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 14px;
+      margin-top: 16px;
+      font-size: 13px;
     }
     .stat-box {
-      background: rgba(0,0,0,0.1);
-      padding: 8px 12px;
-      border-radius: 4px;
+      background: rgba(0,0,0,0.12);
+      padding: 10px 14px;
+      border-radius: 6px;
       border: 1px solid rgba(128,128,128,0.15);
     }
     .stat-label {
-      opacity: 0.7;
-      margin-bottom: 2px;
+      opacity: 0.75;
+      font-size: 12px;
+      margin-bottom: 4px;
+      font-weight: 500;
     }
     .stat-val {
-      font-size: 15px;
-      font-weight: 600;
+      font-size: 16px;
+      font-weight: 650;
     }
     /* Sections */
     .section-title {
-      font-size: 16px;
-      font-weight: 600;
-      margin: 24px 0 12px 0;
+      font-size: 17px;
+      font-weight: 650;
+      margin: 28px 0 14px 0;
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 10px;
     }
     /* Artifacts */
     .artifacts-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-      gap: 12px;
-      margin-bottom: 24px;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 14px;
+      margin-bottom: 26px;
     }
     .artifact-card {
       background: var(--card-bg);
       border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 12px;
+      border-radius: 8px;
+      padding: 14px 16px;
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 14px;
       cursor: pointer;
-      transition: border-color 0.15s;
+      transition: border-color 0.15s, transform 0.1s;
     }
     .artifact-card:hover {
       border-color: var(--accent);
+      transform: translateY(-1px);
     }
     .artifact-icon {
-      font-size: 22px;
+      font-size: 24px;
     }
     .artifact-info {
       flex: 1;
       overflow: hidden;
     }
     .artifact-name {
-      font-weight: 500;
-      font-size: 13px;
+      font-weight: 600;
+      font-size: 14px;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      margin-bottom: 3px;
     }
     .artifact-meta {
-      font-size: 11px;
-      opacity: 0.7;
+      font-size: 12px;
+      opacity: 0.75;
     }
-    /* Transcript */
+    /* Transcript Timeline */
     .timeline {
       display: flex;
       flex-direction: column;
-      gap: 16px;
+      gap: 20px;
     }
     .step-card {
       background: var(--card-bg);
       border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 16px;
+      border-radius: 8px;
+      padding: 20px;
     }
     .user-card {
-      border-left: 4px solid var(--accent);
+      border-left: 5px solid var(--accent);
     }
     .assistant-card {
-      border-left: 4px solid #9c27b0;
+      border-left: 5px solid #9c27b0;
     }
     .step-header {
       display: flex;
       justify-content: space-between;
-      margin-bottom: 10px;
-      font-size: 12px;
-      opacity: 0.8;
+      margin-bottom: 12px;
+      font-size: 13.5px;
+      opacity: 0.85;
+      padding-bottom: 8px;
+      border-bottom: 1px solid rgba(128,128,128,0.12);
     }
     .step-role {
-      font-weight: 600;
-      font-size: 13px;
+      font-weight: 650;
+      font-size: 14px;
     }
     .step-content {
-      font-size: 13.5px;
+      font-size: 14.5px;
+      line-height: 1.7;
+      letter-spacing: 0.015em;
       white-space: pre-wrap;
       word-break: break-word;
     }
+    .step-content p {
+      margin: 8px 0;
+    }
     .thinking-box {
-      margin: 10px 0;
-      padding: 8px 12px;
-      background: rgba(0,0,0,0.15);
-      border-radius: 4px;
-      font-size: 12px;
+      margin: 14px 0;
+      padding: 10px 14px;
+      background: rgba(0,0,0,0.18);
+      border-radius: 6px;
+      font-size: 13px;
     }
     .thinking-box summary {
       cursor: pointer;
-      opacity: 0.8;
-      font-weight: 500;
+      opacity: 0.9;
+      font-weight: 600;
+      font-size: 13.5px;
     }
     .thinking-box pre {
       white-space: pre-wrap;
-      margin: 8px 0 0 0;
-      font-family: monospace;
-      max-height: 200px;
+      margin: 10px 0 0 0;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      line-height: 1.65;
+      max-height: 260px;
       overflow-y: auto;
     }
     .tools-box {
-      margin-top: 12px;
+      margin-top: 14px;
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 8px;
       flex-wrap: wrap;
-      font-size: 12px;
+      font-size: 13px;
     }
     .tool-tag {
-      background: rgba(128,128,128,0.2);
-      padding: 2px 6px;
-      border-radius: 3px;
-      font-family: monospace;
-      font-size: 11px;
+      background: rgba(128,128,128,0.22);
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 500;
     }
     /* Workspace Card */
     .workspace-card {
       background: var(--card-bg);
       border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 16px;
-      margin-bottom: 20px;
+      border-radius: 8px;
+      padding: 18px 20px;
+      margin-bottom: 24px;
     }
     .ws-header {
       display: flex;
@@ -472,16 +500,16 @@ export class ThreadDetailPanel {
       align-items: center;
       flex-wrap: wrap;
       gap: 12px;
-      margin-bottom: 12px;
+      margin-bottom: 14px;
     }
     .ws-title-group {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 12px;
     }
     .ws-status-badge {
-      font-size: 11px;
-      padding: 2px 8px;
+      font-size: 12px;
+      padding: 3px 10px;
       border-radius: 12px;
       font-weight: 600;
       margin-left: 8px;
@@ -500,23 +528,24 @@ export class ThreadDetailPanel {
     .ws-details-grid {
       display: flex;
       flex-direction: column;
-      gap: 6px;
-      font-size: 12.5px;
-      background: rgba(0,0,0,0.1);
-      padding: 10px 14px;
-      border-radius: 4px;
+      gap: 8px;
+      font-size: 13.5px;
+      background: rgba(0,0,0,0.12);
+      padding: 12px 16px;
+      border-radius: 6px;
       border: 1px solid rgba(128,128,128,0.15);
     }
     .ws-detail-item {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 10px;
       flex-wrap: wrap;
     }
     .ws-detail-label {
-      opacity: 0.7;
-      font-size: 11.5px;
-      min-width: 130px;
+      opacity: 0.75;
+      font-size: 12.5px;
+      font-weight: 500;
+      min-width: 140px;
     }
     .ws-path-code {
       font-family: monospace;
@@ -610,7 +639,7 @@ export class ThreadDetailPanel {
   <!-- Context Window Load Meter -->
   <div class="meter-card">
     <div class="meter-header">
-      <span>Context Window Load: ~${m.tokenFormatted} tokens (${m.percentageOfLimit}% of ${this.formatNumber(vscode.workspace.getConfiguration('threadweaver').get<number>('contextLimitThreshold', 100000))} threshold)</span>
+      <span>Context Window Load: ~${m.tokenFormatted} tokens (${m.percentageOfLimit}% of ${this.formatNumber(vscode.workspace.getConfiguration('threadweaver').get<number>('contextLimitThreshold', 2000000))} threshold)</span>
       <span style="color:${barColor}; font-weight:700;">${m.loadLevel.toUpperCase()}</span>
     </div>
     <div class="progress-bar-bg">

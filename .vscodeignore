@@ -9,4 +9,3 @@ tsconfig.json
 .gitignore
 scratch/**
 node_modules/**
-!node_modules/adm-zip/**

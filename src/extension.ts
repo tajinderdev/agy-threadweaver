@@ -19,9 +19,42 @@ export async function activate(context: vscode.ExtensionContext) {
 
   const threadTreeProvider = new ThreadTreeProvider(brainWatcher);
 
-  // Register Tree Views in Sidebar (Dedicated Container & Explorer)
-  vscode.window.registerTreeDataProvider('threadweaver-threads', threadTreeProvider);
-  vscode.window.registerTreeDataProvider('threadweaver-threads-explorer', threadTreeProvider);
+  // Register Tree Views in Sidebar (Dedicated Container & Explorer) with live badges and counts
+  const mainTreeView = vscode.window.createTreeView('threadweaver-threads', {
+    treeDataProvider: threadTreeProvider,
+    showCollapseAll: true
+  });
+  const explorerTreeView = vscode.window.createTreeView('threadweaver-threads-explorer', {
+    treeDataProvider: threadTreeProvider,
+    showCollapseAll: true
+  });
+
+  const updateTreeBadges = () => {
+    const allThreads = brainWatcher.getThreads();
+    const count = allThreads.length;
+    const filter = threadTreeProvider.getSearchFilter();
+
+    if (filter) {
+      mainTreeView.description = `Filter: "${filter}" (${count} total)`;
+      explorerTreeView.description = `Filter: "${filter}" (${count} total)`;
+    } else {
+      mainTreeView.description = `${count} threads`;
+      explorerTreeView.description = `${count} threads`;
+    }
+
+    mainTreeView.badge = {
+      value: count,
+      tooltip: `${count} Antigravity conversation thread(s) indexed`
+    };
+    explorerTreeView.badge = {
+      value: count,
+      tooltip: `${count} Antigravity conversation thread(s) indexed`
+    };
+  };
+
+  brainWatcher.onDidChangeThreads(() => updateTreeBadges());
+  threadTreeProvider.onDidChangeTreeData(() => updateTreeBadges());
+  context.subscriptions.push(mainTreeView, explorerTreeView);
 
   // Status Bar Item
   statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);

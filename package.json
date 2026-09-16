@@ -2,7 +2,7 @@
   "name": "agy-threadweaver",
   "displayName": "ThreadWeaver",
   "description": "Antigravity Thread History, Artifact Manager, Context Size Monitor & Zip Backup Extension",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "publisher": "tajinderdev",
   "icon": "assets/icons/thumb-icon.png",
   "repository": {
@@ -182,8 +182,13 @@
         },
         "threadweaver.contextLimitThreshold": {
           "type": "number",
-          "default": 100000,
+          "default": 2000000,
           "description": "Token count threshold considered high context load"
+        },
+        "threadweaver.groupByTimeframe": {
+          "type": "boolean",
+          "default": true,
+          "description": "Organize threads into collapsible timeframe sections (Pinned, Today, Yesterday, Past 7 Days, Earlier, Older) for scalable navigation across 500+ threads"
         }
       }
     }
