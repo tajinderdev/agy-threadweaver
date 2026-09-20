@@ -1,8 +1,8 @@
 {
   "name": "agy-threadweaver",
   "displayName": "ThreadWeaver",
-  "description": "Antigravity Thread History, Artifact Manager, Context Size Monitor & Zip Backup Extension",
-  "version": "0.2.1",
+  "description": "Antigravity Thread History, Context Monitor, Zip Backups & Local Data API for Agent Training and Analysis",
+  "version": "0.3.0",
   "publisher": "tajinderdev",
   "icon": "assets/icons/thumb-icon.png",
   "repository": {
@@ -116,6 +116,13 @@
         "icon": "$(folder)"
       }
     ],
+    "keybindings": [
+      {
+        "command": "threadweaver.focus",
+        "key": "ctrl+shift+t",
+        "mac": "cmd+shift+t"
+      }
+    ],
     "menus": {
       "view/title": [
         {
@@ -203,10 +210,14 @@
     "package": "npx @vscode/vsce package --allow-missing-repository"
   },
   "dependencies": {
-    "adm-zip": "^0.5.16"
+    "adm-zip": "^0.5.16",
+    "cors": "^2.8.6",
+    "express": "^5.2.1"
   },
   "devDependencies": {
     "@types/adm-zip": "^0.5.7",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
     "@types/node": "^20.17.10",
     "@types/vscode": "^1.85.0",
     "esbuild": "^0.25.0",

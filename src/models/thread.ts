@@ -45,6 +45,8 @@ export interface ContextMetrics {
   percentageOfLimit: number;
 }
 
+export type OSSurface = 'windows' | 'macos' | 'linux' | 'wsl';
+
 export interface ThreadMeta {
   id: string;
   title: string;
@@ -62,6 +64,8 @@ export interface ThreadMeta {
   lastResponse?: string;
   pinned?: boolean;
   archived?: boolean;
+  /** The OS surface this thread originated from (windows, macos, linux, wsl) */
+  surface?: OSSurface;
 }
 
 export interface ThreadExportBundle {

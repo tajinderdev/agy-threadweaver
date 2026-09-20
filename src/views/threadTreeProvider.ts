@@ -3,6 +3,7 @@ import { ThreadMeta, ContextLoadLevel } from '../models/thread';
 import { BrainWatcher } from '../services/brainWatcher';
 import { ArtifactItem } from '../models/artifact';
 import { TitleResolver } from '../services/titleResolver';
+import { PlatformResolver } from '../services/platformResolver';
 
 export type TreeItemType = 'thread' | 'metric' | 'action' | 'artifact' | 'group';
 
@@ -367,18 +368,20 @@ export class ThreadTreeProvider implements vscode.TreeDataProvider<ThreadTreeIte
       thread
     );
 
-    // Sidebar description showing workspace tag, relative timestamp, context size and steps
+    // Sidebar description showing surface tag, workspace tag, relative timestamp, context size and steps
     const pinBadge = thread.pinned ? '📌 ' : '';
     const ws = thread.workspace;
     let wsTag = '';
     if (ws && ws.name) {
       wsTag = ws.isCurrent ? `[${ws.name}] ` : `[${ws.name}] `;
     }
+    // Surface tag — only show for non-native surfaces (WSL, Linux)
+    const surfaceTag = thread.surface ? PlatformResolver.surfaceTag(thread.surface) : '';
 
     const relTime = formatRelativeTime(thread.updatedAt);
     const timeStr = relTime ? `${relTime} • ` : '';
 
-    item.description = `${pinBadge}${wsTag}${timeStr}~${thread.metrics.tokenFormatted} tokens • ${thread.metrics.stepCount} steps`;
+    item.description = `${pinBadge}${surfaceTag}${wsTag}${timeStr}~${thread.metrics.tokenFormatted} tokens • ${thread.metrics.stepCount} steps`;
 
     // Tooltip with comprehensive thread details
     const cleanDesc = TitleResolver.cleanDescription(thread.firstPrompt);
@@ -402,6 +405,9 @@ export class ThreadTreeProvider implements vscode.TreeDataProvider<ThreadTreeIte
     tooltip.appendMarkdown(`- **Steps / Messages:** ${thread.metrics.stepCount} steps / ${thread.metrics.messageCount} messages\n`);
     tooltip.appendMarkdown(`- **Artifacts:** ${thread.artifacts.length} file(s)\n`);
     tooltip.appendMarkdown(`- **Status:** \`${thread.status}\`\n`);
+    if (thread.surface) {
+      tooltip.appendMarkdown(`- **Origin:** ${PlatformResolver.surfaceLabel(thread.surface)}\n`);
+    }
     tooltip.appendMarkdown(`- **Last Active:** ${new Date(thread.updatedAt).toLocaleString()}\n`);
     item.tooltip = tooltip;
 

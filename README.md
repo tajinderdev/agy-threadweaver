@@ -46,6 +46,13 @@
   * Direct reference link (`conversation://<thread-id>`)
 * Copies the briefing directly to your clipboard and opens an editor preview, ready to paste into a brand-new clean Antigravity thread!
 
+### 5. 🔌 Local Data API (Agent Training & Analysis)
+* ThreadWeaver spins up a secure local REST API Server (`127.0.0.1`) upon activation.
+* **Expose complete thread history data** to external tools to train smart agents, analyze learning trajectories, and improve models based on user inputs and corrections.
+* Fetch cross-platform metadata, raw transcript sequences, and markdown artifacts (including user-feedback reviews) structured around projects.
+* Use the **`ThreadWeaver: Show API Server Info`** command to easily copy your secure session Bearer Token.
+* Check out the [API Documentation](docs/API.md) to see endpoints!
+
 ---
 
 ## 🚀 Installation

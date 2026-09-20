@@ -2,13 +2,16 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import * as vscode from 'vscode';
-import { ThreadMeta, ThreadStep, ContextMetrics, ContextLoadLevel } from '../models/thread';
+import { ThreadMeta, ThreadStep, ContextMetrics, ContextLoadLevel, OSSurface } from '../models/thread';
 import { ArtifactItem } from '../models/artifact';
 import { StorageService } from './storageService';
 import { TitleResolver } from './titleResolver';
+import { PlatformResolver } from './platformResolver';
 
 export class BrainWatcher {
   private brainDirs: string[] = [];
+  /** Maps each brain directory path to the OS surface it came from */
+  private brainDirSurface: Map<string, OSSurface> = new Map();
   private threadsCache: Map<string, ThreadMeta> = new Map();
   private fileWatchers: fs.FSWatcher[] = [];
   private debounceTimers: Map<string, NodeJS.Timeout> = new Map();
@@ -36,37 +39,41 @@ export class BrainWatcher {
   }
 
   /**
-   * Resolves all possible Antigravity Brain directories across surfaces (IDE, CLI, App)
+   * Resolves all possible Antigravity Brain directories across surfaces (IDE, CLI, App).
+   * Uses PlatformResolver to detect the current OS surface and return the correct
+   * candidate paths. On WSL this bridges to Windows-side paths as well.
    */
   public resolveAllBrainDirectories(): string[] {
     const dirs: string[] = [];
+    this.brainDirSurface.clear();
+
+    // 1. User-configured override always takes priority
     const configPath = vscode.workspace.getConfiguration('threadweaver').get<string>('brainPath');
     if (configPath && fs.existsSync(configPath)) {
       dirs.push(configPath);
+      this.brainDirSurface.set(configPath, PlatformResolver.detectSurface());
     }
 
-    const homeDir = os.homedir();
-    const candidatePaths = [
-      // Primary: Antigravity IDE (where UI chats live)
-      path.join(homeDir, '.gemini', 'antigravity-ide', 'brain'),
-      // Antigravity CLI
-      path.join(homeDir, '.gemini', 'antigravity-cli', 'brain'),
-      // Antigravity Base
-      path.join(homeDir, '.gemini', 'antigravity', 'brain'),
-      path.join(homeDir, '.gemini', 'brain'),
-      path.join(process.env.APPDATA || '', 'antigravity', 'brain'),
-      path.join(homeDir, '.config', 'antigravity', 'brain')
-    ];
+    // 2. Probe all OS-appropriate candidates
+    const surface = PlatformResolver.detectSurface();
+    const candidatePaths = PlatformResolver.getBrainCandidates(surface);
 
     for (const p of candidatePaths) {
       if (fs.existsSync(p) && !dirs.includes(p)) {
         dirs.push(p);
+        // Determine which sub-surface this path belongs to:
+        // If we are on WSL and the path starts with /mnt/, it came from Windows-side
+        const pathSurface: OSSurface =
+          surface === 'wsl' && p.startsWith('/mnt/') ? 'windows' : surface;
+        this.brainDirSurface.set(p, pathSurface);
       }
     }
 
-    // Default fallback if none exists yet
+    // 3. Default fallback if nothing exists yet (keeps the primary IDE path)
     if (dirs.length === 0) {
-      dirs.push(candidatePaths[0]);
+      const fallback = candidatePaths[0];
+      dirs.push(fallback);
+      this.brainDirSurface.set(fallback, surface);
     }
 
     return dirs;
@@ -94,6 +101,8 @@ export class BrainWatcher {
         continue;
       }
 
+      const dirSurface = this.brainDirSurface.get(brainDir) || PlatformResolver.detectSurface();
+
       try {
         const entries = fs.readdirSync(brainDir, { withFileTypes: true });
 
@@ -109,7 +118,7 @@ export class BrainWatcher {
           }
 
           const threadPath = path.join(brainDir, threadId);
-          const threadMeta = await this.parseThreadDirectory(threadId, threadPath, brainDir, overrides[threadId]);
+          const threadMeta = await this.parseThreadDirectory(threadId, threadPath, brainDir, overrides[threadId], dirSurface);
 
           if (threadMeta) {
             // If already indexed from another dir, keep the most recently active
@@ -153,7 +162,8 @@ export class BrainWatcher {
     threadId: string,
     threadPath: string,
     brainDir: string,
-    override?: { customTitle?: string; pinned?: boolean; archived?: boolean }
+    override?: { customTitle?: string; pinned?: boolean; archived?: boolean },
+    surface?: OSSurface
   ): Promise<ThreadMeta | null> {
     try {
       const stat = fs.statSync(threadPath);
@@ -267,32 +277,22 @@ export class BrainWatcher {
       let wsName = wsInfo?.name;
       let wsCorpus = wsInfo?.corpus;
 
-      // Fallback: If not found in SQLite/vscdb, parse from transcript steps / user_information / tool calls
+      // Fallback: If not found in SQLite/vscdb, parse active workspaces directly from <user_information> block in transcript
       if (!wsPath && steps.length > 0) {
         for (const step of steps) {
           const stepContent = step.content || '';
           const wsMatch = stepContent.match(/The user has \d+ active workspaces[^\n]*\n([\s\S]*?)(?:App Data Directory:|<\/user_information>)/i);
           if (wsMatch && wsMatch[1]) {
-            const lineMatch = wsMatch[1].match(/([A-Za-z]:[^\n\->\r]+?)(?:\s*->\s*([^\n\r]+))?$/m);
-            if (lineMatch) {
-              wsPath = lineMatch[1].trim();
-              if (lineMatch[2]) {
-                wsCorpus = lineMatch[2].trim();
-              }
-              wsName = path.basename(wsPath) || wsPath;
-              wsUri = `file:///${wsPath.replace(/\\/g, '/')}`;
-              break;
-            }
-          }
-
-          if (step.tool_calls && Array.isArray(step.tool_calls)) {
-            for (const tc of step.tool_calls) {
-              const args = tc.args || {};
-              const candidate = args.Cwd || args.DirectoryPath || args.SearchPath || args.Workspace || args.TargetFile || args.AbsolutePath;
-              if (candidate && typeof candidate === 'string') {
-                const cleaned = candidate.replace(/^["']|["']$/g, '').trim();
-                if (cleaned.length > 3 && (cleaned.includes(':\\') || cleaned.includes(':/') || cleaned.startsWith('/'))) {
-                  wsPath = cleaned;
+            const lines = wsMatch[1].split('\n');
+            for (const l of lines) {
+              const lineMatch = l.match(/^\s*([A-Za-z]:[^\n\->\r]+|\/[^\n\->\r]+)(?:\s*->\s*([^\n\r]+))?/);
+              if (lineMatch && lineMatch[1]) {
+                const candidatePath = lineMatch[1].trim();
+                if (!candidatePath.toLowerCase().includes('appdata') && !candidatePath.toLowerCase().includes('temp')) {
+                  wsPath = candidatePath;
+                  if (lineMatch[2]) {
+                    wsCorpus = lineMatch[2].trim();
+                  }
                   wsName = path.basename(wsPath) || wsPath;
                   wsUri = `file:///${wsPath.replace(/\\/g, '/')}`;
                   break;
@@ -349,7 +349,8 @@ export class BrainWatcher {
         lastPrompt,
         lastResponse,
         pinned: override?.pinned,
-        archived: override?.archived
+        archived: override?.archived,
+        surface: surface ?? PlatformResolver.detectSurface()
       };
     } catch (err) {
       console.warn(`[ThreadWeaver] Could not parse thread directory ${threadId}:`, err);

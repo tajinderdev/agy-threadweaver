@@ -149,11 +149,24 @@ export class TitleResolver {
       // Strip markdown code fences, urls, and brackets
       .replace(/```[\s\S]*?```/g, '')
       .replace(/https?:\/\/[^\s]+/g, '')
+      // Strip file mentions like @[c:\path\file.php:L10-L20] or @[filename]
+      .replace(/@\[[^\]]+\]/g, '')
+      .replace(/@\S+/g, '')
       .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
       // Normalize whitespace
       .replace(/\r?\n/g, ' ')
       .replace(/\s+/g, ' ')
       .trim();
+
+    // Format slash commands (e.g. /processing-mantis-tickets 12345 -> Mantis Ticket #12345)
+    const slashMatch = clean.match(/^\/([a-zA-Z0-9_\-]+)(?:\s+([0-9]+))?(?:\s+(.*))?$/);
+    if (slashMatch) {
+      let cmdName = slashMatch[1].replace(/^processing-/, '').replace(/[-_]/g, ' ');
+      cmdName = cmdName.replace(/\b\w/g, (c) => c.toUpperCase());
+      const num = slashMatch[2] ? ` #${slashMatch[2]}` : '';
+      const rest = slashMatch[3] ? `: ${slashMatch[3]}` : '';
+      clean = `${cmdName}${num}${rest}`.trim();
+    }
 
     // Strip conversational filler prefixes
     clean = clean
@@ -198,6 +211,7 @@ export class TitleResolver {
       .replace(/<[\s\S]*?>/g, ' ')
       .replace(/```[\s\S]*?```/g, '')
       .replace(/https?:\/\/[^\s]+/g, '')
+      .replace(/@\[[^\]]+\]/g, '')
       .replace(/\r?\n/g, ' ')
       .replace(/\s+/g, ' ')
       .trim();

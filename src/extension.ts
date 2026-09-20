@@ -8,14 +8,21 @@ import { ThreadTreeProvider, ThreadTreeItem } from './views/threadTreeProvider';
 import { ThreadDetailPanel } from './views/webviews/threadDetailPanel';
 import { ThreadMeta } from './models/thread';
 import { ArtifactItem } from './models/artifact';
+import { ApiServer } from './api/server';
 
 let statusBarItem: vscode.StatusBarItem;
+let apiServer: ApiServer | undefined;
 
 export async function activate(context: vscode.ExtensionContext) {
   console.log('[ThreadWeaver] Activating Antigravity Thread History Extension...');
 
   const storageService = new StorageService(context);
   const brainWatcher = new BrainWatcher(context, storageService);
+  
+  apiServer = new ApiServer(context, brainWatcher);
+  apiServer.start().catch(err => {
+    console.error('[ThreadWeaver API] Failed to start API Server:', err);
+  });
 
   const threadTreeProvider = new ThreadTreeProvider(brainWatcher);
 
@@ -36,17 +43,11 @@ export async function activate(context: vscode.ExtensionContext) {
 
     if (filter) {
       mainTreeView.description = `Filter: "${filter}" (${count} total)`;
-      explorerTreeView.description = `Filter: "${filter}" (${count} total)`;
     } else {
       mainTreeView.description = `${count} threads`;
-      explorerTreeView.description = `${count} threads`;
     }
 
     mainTreeView.badge = {
-      value: count,
-      tooltip: `${count} Antigravity conversation thread(s) indexed`
-    };
-    explorerTreeView.badge = {
       value: count,
       tooltip: `${count} Antigravity conversation thread(s) indexed`
     };
@@ -111,8 +112,12 @@ export async function activate(context: vscode.ExtensionContext) {
   const focusCmd = vscode.commands.registerCommand('threadweaver.focus', async () => {
     try {
       await vscode.commands.executeCommand('threadweaver-threads.focus');
-    } catch (err) {
-      vscode.window.showErrorMessage('Could not focus ThreadWeaver view');
+    } catch {
+      try {
+        await vscode.commands.executeCommand('workbench.view.extension.threadweaver-container');
+      } catch (err) {
+        vscode.window.showErrorMessage('Could not focus ThreadWeaver view');
+      }
     }
   });
 
@@ -480,6 +485,36 @@ export async function activate(context: vscode.ExtensionContext) {
     }
   );
 
+  // 11. Command: Show API Server Info
+  const showApiInfoCmd = vscode.commands.registerCommand(
+    'threadweaver.showApiInfo',
+    async () => {
+      if (!apiServer) {
+        vscode.window.showErrorMessage('API Server is not running.');
+        return;
+      }
+      
+      const port = apiServer.getPort();
+      const token = apiServer.getToken();
+      
+      const copyTokenBtn = 'Copy Token';
+      const openBrowserBtn = 'Open in Browser';
+      
+      const res = await vscode.window.showInformationMessage(
+        `ThreadWeaver API running on http://127.0.0.1:${port}`,
+        copyTokenBtn,
+        openBrowserBtn
+      );
+      
+      if (res === copyTokenBtn) {
+        await vscode.env.clipboard.writeText(token);
+        vscode.window.showInformationMessage('API Bearer token copied to clipboard.');
+      } else if (res === openBrowserBtn) {
+        vscode.env.openExternal(vscode.Uri.parse(`http://127.0.0.1:${port}/api/v1/workspaces`));
+      }
+    }
+  );
+
   context.subscriptions.push(
     focusCmd,
     viewThreadDetailsCmd,
@@ -494,8 +529,16 @@ export async function activate(context: vscode.ExtensionContext) {
     openArtifactCmd,
     renameThreadCmd,
     deleteThreadCmd,
+    showApiInfoCmd,
     {
       dispose: () => brainWatcher.dispose()
+    },
+    {
+      dispose: () => {
+        if (apiServer) {
+          apiServer.stop();
+        }
+      }
     }
   );
 
@@ -505,5 +548,8 @@ export async function activate(context: vscode.ExtensionContext) {
 export function deactivate() {
   if (statusBarItem) {
     statusBarItem.dispose();
+  }
+  if (apiServer) {
+    apiServer.stop();
   }
 }
