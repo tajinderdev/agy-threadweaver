@@ -50,6 +50,7 @@ Get the top-level projects that have been discovered across your threads.
   {
     "workspaces": [
       {
+        "id": "c4ca4238a0b923820dcc509a6f75849b",
         "uri": "file:///d:/Work/project-A",
         "name": "project-A",
         "path": "d:/Work/project-A",
@@ -60,9 +61,9 @@ Get the top-level projects that have been discovered across your threads.
   }
   ```
 
-**`GET /api/v1/workspaces/:encodedUri/threads`**
+**`GET /api/v1/workspaces/:id/threads`**
 - **Description:** Get all lightweight thread metadata assigned to a specific workspace.
-- **Parameters:** `:encodedUri` should be the URL-encoded `uri` string from the workspaces response.
+- **Parameters:** `:id` must be the MD5 hash `id` string returned from the workspaces response.
 
 ---
 

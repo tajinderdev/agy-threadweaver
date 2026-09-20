@@ -108,6 +108,15 @@ async function runTests() {
     let data: any = await res.json();
     assert(data.workspaces.length === 1, `Correctly aggregated 1 unique workspace`);
     assert(data.workspaces[0].threadCount === 2, `Workspace thread count is 2`);
+    assert(data.workspaces[0].id !== undefined, `Workspace object has an ID`);
+
+    const workspaceId = data.workspaces[0].id;
+
+    // Test 3b: Get Threads for specific Workspace ID
+    res = await fetch(`${baseUrl}/workspaces/${workspaceId}/threads`, { headers });
+    assert(res.status === 200, `Authorized request to /workspaces/:id/threads succeeded`);
+    data = await res.json();
+    assert(data.threads.length === 2, `Correctly fetched threads for the specific workspace ID`);
 
     // Test 4: Get Threads (Filtered)
     res = await fetch(`${baseUrl}/threads?status=active`, { headers });
