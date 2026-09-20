@@ -9,3 +9,6 @@ tsconfig.json
 .gitignore
 scratch/**
 node_modules/**
+*.json
+!package.json
+context_*.md

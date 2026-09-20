@@ -285,10 +285,13 @@ export class BrainWatcher {
           if (wsMatch && wsMatch[1]) {
             const lines = wsMatch[1].split('\n');
             for (const l of lines) {
-              const lineMatch = l.match(/^\s*([A-Za-z]:[^\n\->\r]+|\/[^\n\->\r]+)(?:\s*->\s*([^\n\r]+))?/);
+              const lineMatch = l.match(/^\s*(.+?)(?:\s*->\s*(.+))?$/);
               if (lineMatch && lineMatch[1]) {
                 const candidatePath = lineMatch[1].trim();
-                if (!candidatePath.toLowerCase().includes('appdata') && !candidatePath.toLowerCase().includes('temp')) {
+                // Ensure it looks like a path before accepting it
+                if ((candidatePath.match(/^[A-Za-z]:/) || candidatePath.startsWith('/')) && 
+                    !candidatePath.toLowerCase().includes('appdata') && 
+                    !candidatePath.toLowerCase().includes('temp')) {
                   wsPath = candidatePath;
                   if (lineMatch[2]) {
                     wsCorpus = lineMatch[2].trim();

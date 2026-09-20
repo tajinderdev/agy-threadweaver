@@ -2,7 +2,7 @@
   "name": "agy-threadweaver",
   "displayName": "ThreadWeaver",
   "description": "Antigravity Thread History, Context Monitor, Zip Backups & Local Data API for Agent Training and Analysis",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "publisher": "tajinderdev",
   "icon": "assets/icons/thumb-icon.png",
   "repository": {

@@ -68,7 +68,7 @@ export class TitleResolver {
 
     if (targetScript) {
       await new Promise<void>((resolve) => {
-        exec(`python "${targetScript}"`, { timeout: 3500 }, (err, stdout) => {
+        exec(`python "${targetScript}"`, { timeout: 30000 }, (err, stdout) => {
           if (!err && stdout) {
             try {
               const parsed = JSON.parse(stdout.trim());

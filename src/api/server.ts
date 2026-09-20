@@ -35,7 +35,7 @@ export class ApiServer {
 
     // Register Routes
     const router = express.Router();
-    registerWorkspaceRoutes(router, this.brainWatcher);
+    registerWorkspaceRoutes(router, this.brainWatcher, this.context.extensionPath);
     registerThreadRoutes(router, this.brainWatcher);
     registerArtifactRoutes(router, this.brainWatcher);
 
